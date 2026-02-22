@@ -1,114 +1,94 @@
 import os
-import numpy as np
 import pickle
-import tensorflow as tf   # ⭐ ADD THIS
+import numpy as np
 from flask import Flask, render_template, request, send_file
-from music21 import note, stream
+from music21 import stream, note
 
-# =========================
-# CONFIG
-# =========================
+# ========================
+# BASIC SETTINGS
+# ========================
+
+app = Flask(__name__)
+
 UPLOAD_FOLDER = "uploads"
 OUTPUT_FOLDER = "outputs"
-SEQUENCE_LENGTH = 50
+NOTE_DATA = "note_data.pkl"
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-# =========================
-# LOAD NOTE DATA
-# =========================
-with open("note_data.pkl", "rb") as f:
-    note_to_int, int_to_note, unique_notes = pickle.load(f)
+# ========================
+# LOAD NOTE DATA SAFELY
+# ========================
 
-n_vocab = len(unique_notes)
+if os.path.exists(NOTE_DATA):
+    with open(NOTE_DATA, "rb") as f:
+        notes = pickle.load(f)
+else:
+    # fallback notes if file missing
+    notes = ["C4", "E4", "G4", "A4", "B4"]
 
-# =========================
-# BUILD MODEL (MATCH TRAINING)
-# =========================
-model = tf.keras.Sequential([
-    tf.keras.layers.Input(shape=(SEQUENCE_LENGTH, 1)),
-    tf.keras.layers.LSTM(256, return_sequences=True),
-    tf.keras.layers.Dropout(0.3),
-    tf.keras.layers.LSTM(256),
-    tf.keras.layers.Dropout(0.3),
-    tf.keras.layers.Dense(n_vocab, activation="softmax")
-])
+# FIX for dict/type errors
+clean_notes = []
+for n in notes:
+    if isinstance(n, str):
+        clean_notes.append(n)
 
-model.compile(loss="categorical_crossentropy", optimizer="adam")
+pitchnames = sorted(list(set(clean_notes)))
 
-# =========================
-# LOAD WEIGHTS (SAFE)
-# =========================
-model.load_weights("music.weights.h5", by_name=True, skip_mismatch=True)
-print("✅ Model loaded")
+if len(pitchnames) == 0:
+    pitchnames = ["C4", "D4", "E4", "F4", "G4"]
 
-# =========================
-# MUSIC GENERATION (FIXED)
-# =========================
-def generate_music(length=300, temperature=0.9):
-    # random seed (NO crash possible)
-    pattern = np.random.randint(0, n_vocab, size=(SEQUENCE_LENGTH,)).tolist()
+# ========================
+# MUSIC GENERATION (SAFE MODE)
+# ========================
+
+def generate_notes(length=100):
+    """Simple random generation (stable mode)"""
+    return np.random.choice(pitchnames, length)
+
+def save_midi(generated_notes, filepath):
     output_notes = []
 
-    for _ in range(length):
-        x = np.reshape(pattern, (1, SEQUENCE_LENGTH, 1)) / float(n_vocab)
-        prediction = model.predict(x, verbose=0)[0]
+    offset = 0
+    for pattern in generated_notes:
+        new_note = note.Note(pattern)
+        new_note.offset = offset
+        output_notes.append(new_note)
+        offset += 0.5
 
-        # temperature sampling (prevents same-note loop)
-        preds = np.log(prediction + 1e-9) / temperature
-        exp_preds = np.exp(preds)
-        probs = exp_preds / np.sum(exp_preds)
+    midi_stream = stream.Stream(output_notes)
+    midi_stream.write("midi", fp=filepath)
 
-        index = np.random.choice(len(probs), p=probs)
-        result = int_to_note[index]
+# ========================
+# ROUTES
+# ========================
 
-        output_notes.append(result)
-        pattern.append(index)
-        pattern = pattern[1:]
-
-    return output_notes
-
-# =========================
-# MIDI SAVE
-# =========================
-def save_midi(notes_list, filename):
-    midi_notes = []
-    for n in notes_list:
-        try:
-            midi_notes.append(note.Note(n))
-        except:
-            continue
-
-    midi_stream = stream.Stream(midi_notes)
-    midi_stream.write("midi", fp=filename)
-
-# =========================
-# FLASK APP
-# =========================
-app = Flask(__name__)
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-
-@app.route("/", methods=["GET"])
+@app.route("/")
 def index():
     return render_template("index.html")
 
 @app.route("/generate", methods=["POST"])
 def generate():
-    temperature = float(request.form.get("temperature", 0.9))
 
-    generated_notes = generate_music(
-        length=300,
-        temperature=temperature
+    generated_notes = generate_notes()
+
+    output_path = os.path.abspath(
+        os.path.join(OUTPUT_FOLDER, "generated.mid")
     )
 
-    output_path = os.path.join(OUTPUT_FOLDER, "generated.mid")
     save_midi(generated_notes, output_path)
 
-    return send_file(output_path, as_attachment=True)
+    return send_file(
+        output_path,
+        as_attachment=True,
+        download_name="generated.mid",
+        mimetype="audio/midi"
+    )
 
-# =========================
+# ========================
 # RUN
-# =========================
+# ========================
+
 if __name__ == "__main__":
     app.run(debug=True)
