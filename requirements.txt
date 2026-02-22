@@ -1,3 +1,5 @@
-Flask
-gunicorn
+flask
 numpy
+tensorflow-cpu==2.15.0
+music21
+gunicorn
