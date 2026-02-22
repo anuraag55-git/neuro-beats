@@ -1,7 +1,6 @@
 import os
 import numpy as np
 import pickle
-import tensorflow as tf
 from flask import Flask, render_template, request, send_file
 from music21 import note, stream
 
