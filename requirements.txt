@@ -1,4 +1,5 @@
 flask
 numpy
 music21
+tensorflow==2.15.0
 gunicorn
