@@ -1,5 +1,5 @@
-flask
-numpy
-tensorflow-cpu==2.15.0
-music21
-gunicorn
+Flask==3.0.0
+numpy==1.26.4
+tensorflow==2.15.0
+music21==9.1.0
+gunicorn==21.2.0
