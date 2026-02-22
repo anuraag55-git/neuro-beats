@@ -1,5 +1,3 @@
 Flask
 gunicorn
 numpy
-music21
-tensorflow
