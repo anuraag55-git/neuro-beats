@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Neuro Beats</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="background"></div>
+
+<div class="container">
+    <h1>🎵 Neuro Beats</h1>
+    <p class="subtitle">AI-powered music generation from your inspiration</p>
+
+    <div class="card">
+        <h2>Upload MIDI Sample</h2>
+
+        <form action="/generate" method="POST" enctype="multipart/form-data">
+            <input type="file" name="file" accept=".mid" required>
+            <button type="submit">Generate New Song</button>
+        </form>
+    </div>
+
+    <footer>Made with ❤️ using AI</footer>
+</div>
+
+</body>
+</html>
